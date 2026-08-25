@@ -1,101 +1,100 @@
-# Сервер MCP для поиска файлов
+# File Finder MCP
 
-Это сервер Model Context Protocol (MCP), написанный на Python, который интегрируется с Cline в VSCode. Он ищет файлы в файловой системе по фрагменту пути и возвращает результаты в формате JSON.
+A small Model Context Protocol server that searches for files below its current working directory.
 
-## Требования
+It exposes one tool, `find_files`. The tool accepts a path fragment, performs a case-insensitive recursive search, and returns matching file names, absolute paths, sizes, and timestamps as JSON.
 
-- Python 3.9 или выше
-- Пакет Python `mcp` (установить с помощью `pip install mcp`)
-- VSCode с установленным расширением Cline
+## Requirements
 
-## Установка
+- Python 3.10 or newer
+- The Python `mcp` package
+- An MCP-compatible client such as Cline
 
-1. Клонируйте этот репозиторий:
-   ```bash
-   git clone https://github.com/kyan9400/file-finder-mcp.git
-   cd file-finder-mcp
-   ```
+## Setup
 
-2. Установите необходимый пакет Python:
-   ```bash
-   pip install mcp
-   ```
+```bash
+git clone https://github.com/kyan9400/file-finder-mcp.git
+cd file-finder-mcp
 
-3. Обновите файл конфигурации Cline, чтобы включить сервер MCP:
-   - Откройте или создайте файл конфигурации Cline (например, `C:\Users\<ВашеИмяПользователя>\AppData\Roaming\Code\User\cline_config.json` на Windows).
-   - Добавьте следующую конфигурацию:
-     ```json
-     {
-       "mcpServers": {
-         "file-finder-mcp": {
-           "args": ["file_finder_server.py"],
-           "command": "python",
-           "autoApprove": [],
-           "disabled": false
-         }
-       }
-     }
-     ```
+python -m venv .venv
+```
 
-## Запуск сервера
+Activate the environment:
 
-Запустите сервер вручную для тестирования:
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+On macOS or Linux:
+
+```bash
+source .venv/bin/activate
+```
+
+Install the dependency:
+
+```bash
+python -m pip install mcp
+```
+
+## Client configuration
+
+The repository includes a small Cline configuration example. Use an absolute path to the server script in your own configuration:
+
+```json
+{
+  "mcpServers": {
+    "file-finder-mcp": {
+      "command": "python",
+      "args": [
+        "C:\\path\\to\\file-finder-mcp\\file_finder_server.py"
+      ],
+      "autoApprove": [],
+      "disabled": false
+    }
+  }
+}
+```
+
+Restart the client after changing its MCP configuration.
+
+## Tool
+
+### `find_files`
+
+Input:
+
+```json
+{
+  "path_fragment": "test"
+}
+```
+
+Example response:
+
+```json
+[
+  {
+    "file_name": "test_config.py",
+    "path": "C:\\projects\\example\\test_config.py",
+    "size": 1240,
+    "created": "2026-01-15T10:30:00"
+  }
+]
+```
+
+The search begins in the server process's current working directory. The fragment is matched against the full path, not only the file name.
+
+## Running it directly
+
 ```bash
 python file_finder_server.py
 ```
-Также Cline автоматически запустит его при использовании инструмента.
 
-## Тестирование с Cline
+The server communicates over standard input and output, so it normally runs under an MCP client rather than as a standalone interactive program.
 
-1. Откройте VSCode с активным расширением Cline.
-2. Используйте следующий запрос в интерфейсе Cline для тестирования сервера:
-   ```text
-   Найдите файлы в файловой системе, содержащие фрагмент "test"
-   ```
-3. Cline вызовет инструмент `find_files`, и вы увидите ответ в формате JSON, например:
-   ```json
-   [
-     {
-       "file_name": "test_file.txt",
-       "path": "D:\\files\\NEW JOB\\file-finder-mcp\\test_file.txt",
-       "size": 1234,
-       "created": "2025-03-02T13:00:00.000000"
-     }
-   ]
-   ```
+## Current limitations
 
-## Примечания
-
-- Поиск начинается с текущей рабочей директории, где запущен сервер.
-- Поиск нечувствителен к регистру.
-- Размер указывается в байтах, а дата создания — в формате ISO.
-
-## Лицензия
-
-Этот проект лицензирован под лицензией MIT.
-```
-
-### Инструкции по использованию файла README.md
-
-1. **Создайте файл README.md:**
-   - В VSCode щелкните правой кнопкой мыши в боковой панели Explorer и выберите "Создать новый файл".
-   - Назовите файл `README.md` и откройте его.
-
-2. **Скопируйте содержимое:**
-   - Скопируйте приведенное выше содержимое и вставьте его в файл `README.md`.
-
-3. **Сохраните файл:**
-   - Сохраните файл `README.md`, нажав `Ctrl+S` (или `Cmd+S` на Mac).
-
-4. **Закоммитьте и отправьте изменения в GitHub:**
-   - Если вы еще не закоммитили и не отправили изменения, сделайте это сейчас:
-     ```bash
-     git add README.md
-     git commit -m "Добавлен файл README с инструкциями по установке и использованию"
-     git push origin main
-     ```
-
-5. **Проверьте на GitHub:**
-   - Перейдите в ваш репозиторий на GitHub (https://github.com/kyan9400/file-finder-mcp) и убедитесь, что файл `README.md` отображается и содержит правильное содержимое.
-
-Этот файл README.md предоставляет четкие инструкции для тех, кто хочет настроить, запустить и протестировать ваш сервер MCP. Если у вас есть дополнительные вопросы или требуется дальнейшая настройка, не стесняйтесь обращаться!
+- Each request walks the directory tree again.
+- There are no exclusion patterns or result limits yet.
+- The returned `created` value comes from `st_ctime`; its exact meaning differs between operating systems.
