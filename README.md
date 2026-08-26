@@ -1,100 +1,119 @@
 # File Finder MCP
 
-A small Model Context Protocol server that searches for files below its current working directory.
+[![CI](https://github.com/kyan9400/file-finder-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/kyan9400/file-finder-mcp/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/kyan9400/file-finder-mcp)](https://github.com/kyan9400/file-finder-mcp/releases)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-0f766e)](LICENSE)
 
-It exposes one tool, `find_files`. The tool accepts a path fragment, performs a case-insensitive recursive search, and returns matching file names, absolute paths, sizes, and timestamps as JSON.
+A bounded, ranked file-search server for Model Context Protocol clients. It finds files by partial path without allowing each tool call to choose an arbitrary filesystem root.
 
-## Requirements
+## Why it is useful
 
-- Python 3.10 or newer
-- The Python `mcp` package
-- An MCP-compatible client such as Cline
+Large workspaces make broad filesystem searches noisy and expensive. File Finder MCP keeps discovery predictable:
 
-## Setup
+- fixes the search root when the process starts;
+- never follows directory symlinks;
+- skips version-control, dependency, cache, and build directories;
+- caps scanned files and returned matches;
+- ranks exact names, prefixes, filenames, and paths deterministically;
+- supports extension filters and workspace-relative exclusions;
+- returns typed results with scan telemetry;
+- includes a standalone CLI for scripts and debugging.
 
-```bash
-git clone https://github.com/kyan9400/file-finder-mcp.git
-cd file-finder-mcp
+The server targets the stable 2.x MCP Python SDK.
 
-python -m venv .venv
-```
+## Install
 
-Activate the environment:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-On macOS or Linux:
-
-```bash
-source .venv/bin/activate
-```
-
-Install the dependency:
+Requires Python 3.11 or newer.
 
 ```bash
-python -m pip install mcp
+python -m pip install .
 ```
 
-## Client configuration
+For an isolated command-line installation, `pipx install .` is also suitable.
 
-The repository includes a small Cline configuration example. Use an absolute path to the server script in your own configuration:
+## Configure an MCP client
+
+Set `FILE_FINDER_ROOT` to the only directory the server should expose:
 
 ```json
 {
   "mcpServers": {
-    "file-finder-mcp": {
-      "command": "python",
-      "args": [
-        "C:\\path\\to\\file-finder-mcp\\file_finder_server.py"
-      ],
-      "autoApprove": [],
-      "disabled": false
+    "file-finder": {
+      "command": "file-finder-mcp",
+      "env": {
+        "FILE_FINDER_ROOT": "/absolute/path/to/workspace"
+      }
     }
   }
 }
 ```
 
-Restart the client after changing its MCP configuration.
+Restart the MCP client after changing its configuration.
 
 ## Tool
 
-### `find_files`
+`find_files` accepts:
 
-Input:
-
-```json
-{
-  "path_fragment": "test"
-}
-```
+| Argument | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `query` | string | required | Case-insensitive filename or path fragment |
+| `max_results` | integer | `50` | Result cap from 1 to 500 |
+| `extensions` | string array | all | Optional values such as `py`, `.ts`, or `md` |
+| `exclude` | string array | none | Workspace-relative glob exclusions |
+| `include_hidden` | boolean | `false` | Include hidden paths outside protected defaults |
 
 Example response:
 
 ```json
-[
-  {
-    "file_name": "test_config.py",
-    "path": "C:\\projects\\example\\test_config.py",
-    "size": 1240,
-    "created": "2026-01-15T10:30:00"
-  }
-]
+{
+  "root": "/workspace",
+  "query": "invoice",
+  "scannedFiles": 1842,
+  "skippedEntries": 14,
+  "durationMs": 12.48,
+  "truncated": false,
+  "results": [
+    {
+      "path": "/workspace/src/invoice.py",
+      "relativePath": "src/invoice.py",
+      "name": "invoice.py",
+      "extension": ".py",
+      "score": 0,
+      "sizeBytes": 2740
+    }
+  ]
+}
 ```
 
-The search begins in the server process's current working directory. The fragment is matched against the full path, not only the file name.
+## CLI
 
-## Running it directly
+The same search engine is available without an MCP client:
 
 ```bash
-python file_finder_server.py
+file-finder invoice --root . --extension py --exclude "fixtures/**" --limit 25
 ```
 
-The server communicates over standard input and output, so it normally runs under an MCP client rather than as a standalone interactive program.
+It writes structured JSON to stdout, which makes it easy to compose with other tools.
 
-## Current limitations
+## Security model
 
-- Each request walks the directory tree again.
-- There are no exclusion patterns or result limits yet.
-- The returned `created` value comes from `st_ctime`; its exact meaning differs between operating systems.
+File Finder MCP returns file metadata, not file contents. The configured root is resolved once at startup. Searches cannot replace it, and directory symlinks are not traversed. Common sensitive or expensive directories such as `.git`, `.env`, `node_modules`, `.venv`, `dist`, and cache folders are excluded by default.
+
+Run one server instance per trust boundary. This is a discovery tool, not an authorization system.
+
+## Development
+
+```bash
+python -m pip install -e ".[dev]"
+ruff check .
+ruff format --check .
+pytest
+python -m build
+```
+
+CI covers Python 3.11 and 3.13 on Linux and Windows.
+
+## License
+
+[MIT](LICENSE)

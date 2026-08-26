@@ -1,8 +1,10 @@
 {
   "mcpServers": {
     "file-finder-mcp": {
-      "args": ["file_finder_server.py"],
-      "command": "python",
+      "command": "file-finder-mcp",
+      "env": {
+        "FILE_FINDER_ROOT": "C:\\path\\to\\workspace"
+      },
       "autoApprove": [],
       "disabled": false
     }
