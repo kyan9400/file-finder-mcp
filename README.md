@@ -51,6 +51,8 @@ Set `FILE_FINDER_ROOT` to the only directory the server should expose:
 
 Restart the MCP client after changing its configuration.
 
+A ready-to-edit configuration for Cline is provided in [`examples/cline_config.json`](examples/cline_config.json).
+
 ## Tool
 
 `find_files` accepts:
